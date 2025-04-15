@@ -75,10 +75,8 @@ module.exports.getURLBuilder = (options) => {
  *
  * @param {string|Buffer} secret
  */
-function createSecret(secret) {
-  const hash = crypto.createHash('sha256')
-  hash.update(secret)
-  return hash.digest()
+function createSecret(secret, iv) {
+  return crypto.hkdfSync('sha256', secret, new Uint8Array(32), iv, 32)
 }
 
 /**
@@ -99,7 +97,7 @@ function createIv() {
  */
 module.exports.encrypt = (input, secret) => {
   const iv = createIv()
-  const cipher = crypto.createCipheriv('aes-256-ccm', createSecret(secret), iv, {authTagLength: 16})
+  const cipher = crypto.createCipheriv('aes-256-ccm', createSecret(secret, iv), iv, {authTagLength: 16})
   let encrypted = cipher.update(input, 'utf8', 'base64url')
   encrypted += cipher.final('base64url')
   encrypted += cipher.getAuthTag().toString('base64url')
@@ -126,7 +124,7 @@ module.exports.decrypt = (encrypted, secret) => {
 
   let decipher
   try {
-    decipher = crypto.createDecipheriv('aes-256-ccm', createSecret(secret), iv, {authTagLength: 16})
+    decipher = crypto.createDecipheriv('aes-256-ccm', createSecret(secret, iv), iv, {authTagLength: 16})
   } catch (err) {
     if (err.code === 'ERR_CRYPTO_INVALID_IV') {
       throw new Error('Invalid initialization vector')
